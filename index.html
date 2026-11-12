@@ -43,10 +43,16 @@ header{padding-top:18px;display:flex;flex-direction:column;gap:10px}
 .disclaimer{font-size:12.5px;color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 40%,transparent);
   background:color-mix(in srgb,var(--amber) 9%,transparent);border-radius:10px;padding:8px 12px;margin:0}
 
-nav{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;background:var(--surface);padding:6px;border-radius:14px;border:1px solid var(--line);
+nav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;background:var(--surface);padding:6px;border-radius:14px;border:1px solid var(--line);
   position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
-nav a{text-align:center;text-decoration:none;color:var(--muted);font:700 12.5px var(--font-body);padding:10px 4px;border-radius:10px;letter-spacing:.01em}
+nav a{text-align:center;text-decoration:none;color:var(--muted);font:700 12.5px var(--font-body);padding:10px 2px;border-radius:10px;letter-spacing:.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:420px){nav a{font-size:11px}}
+.seg{display:flex;gap:6px;background:var(--surface2);padding:4px;border-radius:10px;width:max-content;max-width:100%}
+.seg button{border:0;background:none;color:var(--muted);font:700 13px var(--font-body);padding:8px 14px;border-radius:8px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--mint);color:var(--bg)}
+.tablewrap{overflow-x:auto;max-height:320px;border:1px solid var(--line);border-radius:12px}
+.tablewrap table th{position:sticky;top:0;background:var(--surface)}
 nav a:hover{color:var(--fg)}
 nav a[aria-current="page"]{background:var(--mint);color:var(--bg)}
 nav a:focus-visible,input:focus-visible,button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
@@ -107,6 +113,7 @@ footer strong{color:var(--fg)}
     <a href="#verdoppeln">72er-Regel</a>
     <a href="#fire">FIRE</a>
     <a href="#inflation">Inflation</a>
+    <a href="#kredit">Kredit</a>
   </nav>
 
   <!-- SPARPLAN -->
@@ -185,6 +192,34 @@ footer strong{color:var(--fg)}
       <div class="stat"><div class="k">Halbierung nach</div><div class="v" id="i-half"></div></div>
     </div>
     <svg class="chart" id="i-chart" viewBox="0 0 700 220" role="img" aria-label="Kaufkraftverlust"></svg>
+  </section>
+
+  <!-- KREDIT -->
+  <section class="panel" id="p-kredit" data-view="kredit" hidden>
+    <h2>Kreditrechner</h2>
+    <p class="lead">Annuitätenkredit: gleichbleibende Monatsrate aus Zins und Tilgung. Gib die Laufzeit oder deine Wunschrate vor.</p>
+    <div class="seg" role="group" aria-label="Berechnungsart">
+      <button type="button" id="k-mode-y" aria-pressed="true">Laufzeit vorgeben</button>
+      <button type="button" id="k-mode-r" aria-pressed="false">Rate vorgeben</button>
+    </div>
+    <div class="fields">
+      <div class="field"><label for="k-amt">Kreditbetrag (€)</label><input type="number" id="k-amt" value="250000" min="0" step="5000"></div>
+      <div class="field"><label for="k-r">Sollzins p.a. <output id="k-r-o"></output></label><input type="range" id="k-r" min="0" max="12" step="0.05" value="3.5"></div>
+      <div class="field" id="k-y-f"><label for="k-y">Laufzeit <output id="k-y-o"></output></label><input type="range" id="k-y" min="1" max="40" step="1" value="25"></div>
+      <div class="field" id="k-rate-f" hidden><label for="k-rate">Monatsrate (€)</label><input type="number" id="k-rate" value="1200" min="0" step="50"></div>
+      <div class="field"><label for="k-st">Sondertilgung pro Jahr (€)</label><input type="number" id="k-st" value="0" min="0" step="500"></div>
+      <div class="field"><label for="k-fee">Einmalige Kosten (€, z. B. Bearbeitung)</label><input type="number" id="k-fee" value="0" min="0" step="100"></div>
+    </div>
+    <div class="result"><span class="k" id="k-big-k">Monatsrate</span><span class="big" id="k-big"></span></div>
+    <div class="stats">
+      <div class="stat"><div class="k">Zinsen gesamt</div><div class="v rose" id="k-int"></div></div>
+      <div class="stat"><div class="k">Zurückgezahlt gesamt</div><div class="v" id="k-tot"></div></div>
+      <div class="stat"><div class="k" id="k-third-k">Schuldenfrei nach</div><div class="v mint" id="k-dur"></div></div>
+    </div>
+    <svg class="chart" id="k-chart" viewBox="0 0 700 240" role="img" aria-label="Restschuld und gezahlte Zinsen"></svg>
+    <div class="legend"><span><i style="background:var(--mint)"></i>Restschuld</span><span><i style="background:var(--rose)"></i>Zinsen bisher</span></div>
+    <div class="tablewrap"><table id="k-table"></table></div>
+    <p class="note" id="k-note">Vereinfachte Rechnung mit festem Sollzins über die gesamte Laufzeit, monatliche Raten. Effektivzins, Versicherungen und Gebühren der Bank können abweichen. Keine Finanzierungsberatung.</p>
   </section>
 
   <footer>
@@ -289,7 +324,42 @@ function inflation(){
   svg.innerHTML=axis(svg,W,H,{...P,l:P.l},amt||1,y,'')+bars;
 }
 
-const views={sparplan,verdoppeln,fire,inflation};
+/* Kredit (Annuitätendarlehen, monatliche Raten, Sondertilgung jeweils am Jahresende) */
+let kMode='y';
+function setKMode(m){kMode=m;$('k-mode-y').setAttribute('aria-pressed',m==='y');$('k-mode-r').setAttribute('aria-pressed',m==='r');
+  $('k-y-f').hidden=m!=='y';$('k-rate-f').hidden=m!=='r';kredit()}
+$('k-mode-y').addEventListener('click',()=>setKMode('y'));$('k-mode-r').addEventListener('click',()=>setKMode('r'));
+function kredit(){
+  const P=num('k-amt'),r=+$('k-r').value/100,i=r/12,st=num('k-st'),fee=num('k-fee');
+  $('k-r-o').textContent=pct(r*100);$('k-y-o').textContent=$('k-y').value+' J.';
+  let rate;
+  if(kMode==='y'){const n=+$('k-y').value*12;rate=i>0?P*i/(1-Math.pow(1+i,-n)):P/n}
+  else rate=num('k-rate');
+  const fmtDur=m=>{const y=Math.floor(m/12),mo=m%12;return (y?y+' J. ':'')+(mo?mo+' M.':'')||'0 M.'};
+  if(P<=0||rate<=0){['k-big','k-int','k-tot','k-dur'].forEach(id=>$(id).textContent='–');$('k-chart').innerHTML='';$('k-table').innerHTML='';return}
+  if(kMode==='r'&&rate<=P*i){$('k-big-k').textContent='Laufzeit';$('k-big').textContent='nie getilgt';
+    $('k-int').textContent='–';$('k-tot').textContent='–';$('k-dur').textContent='–';$('k-third-k').textContent='Hinweis';
+    $('k-chart').innerHTML='';$('k-table').innerHTML=`<tr><td>Die Rate von ${eur.format(rate)} deckt nicht einmal die Zinsen von ${eur.format(P*i)} pro Monat. Mindestens ${eur.format(Math.ceil(P*i+1))} nötig.</td></tr>`;return}
+  let b=P,m=0,intSum=0,paid=0;const yrs=[[0,P,0]];const rows=[];let yi=0,yp=0;
+  while(b>0.005&&m<720){const it=b*i;let pr=Math.min(rate-it,b);b-=pr;intSum+=it;paid+=it+pr;yi+=it;yp+=pr;m++;
+    if(m%12===0&&st>0&&b>0){const s=Math.min(st,b);b-=s;paid+=s;yp+=s}
+    if(m%12===0||b<=0.005){rows.push([Math.ceil(m/12),yi,yp,Math.max(0,b)]);yrs.push([m/12,Math.max(0,b),intSum]);yi=0;yp=0}}
+  $('k-big-k').textContent=kMode==='y'?'Monatsrate':'Schuldenfrei nach';
+  $('k-big').textContent=kMode==='y'?eur.format(rate):fmtDur(m);
+  $('k-int').textContent=eur.format(intSum+fee);$('k-tot').textContent=eur.format(paid+fee);
+  $('k-third-k').textContent=kMode==='y'?'Schuldenfrei nach':'Zinsanteil';
+  $('k-dur').textContent=kMode==='y'?fmtDur(m):Math.round(intSum/paid*100)+' %';
+  const W=700,H=240,Pd={l:62,r:12,t:12,b:28},svg=$('k-chart'),span=Math.max(1,yrs[yrs.length-1][0]);
+  const maxV=Math.max(P,intSum)*1.05;
+  const X=x=>Pd.l+(W-Pd.l-Pd.r)*x/span,Y=v=>H-Pd.b-(H-Pd.t-Pd.b)*v/maxV;
+  svg.innerHTML=axis(svg,W,H,Pd,maxV,Math.ceil(span),'')+
+    `<path d="${path(yrs.map(p=>[X(p[0]),Y(p[1])]))} L${X(span)} ${H-Pd.b} L${X(0)} ${H-Pd.b} Z" fill="var(--mint)" fill-opacity=".15"/>`+
+    `<path d="${path(yrs.map(p=>[X(p[0]),Y(p[1])]))}" fill="none" stroke="var(--mint)" stroke-width="2.5"/>`+
+    `<path d="${path(yrs.map(p=>[X(p[0]),Y(p[2])]))}" fill="none" stroke="var(--rose)" stroke-width="2.5"/>`;
+  $('k-table').innerHTML='<tr><th>Jahr</th><th>Zinsen</th><th>Tilgung</th><th>Restschuld</th></tr>'+rows.map(r=>`<tr><td>${r[0]}</td><td>${eur.format(r[1])}</td><td>${eur.format(r[2])}</td><td>${eur.format(r[3])}</td></tr>`).join('');
+}
+
+const views={sparplan,verdoppeln,fire,inflation,kredit};
 document.querySelectorAll('input').forEach(el=>el.addEventListener('input',()=>views[el.closest('[data-view]').dataset.view]()));
 function route(){
   const v=views[location.hash.slice(1)]?location.hash.slice(1):'sparplan';
